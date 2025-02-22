@@ -13,20 +13,27 @@ interface IUserFace {
 interface RecognizedUser {
   userId: string;
   name: string;
+  email: string;
 }
-
-interface IUser{
+interface IUser {
   _id: string;
   name: string;
+  email: string;
 }
 
-const recognizedUsers: RecognizedUser[] = [];
+interface UsersForAttendance {
+  id: string;
+  isPresent: string;
+}
 
 /**
  * @desc Mark attendance using facial recognition
  * @route POST /api/attendance/mark
  */
-export const markAttendance = async (req: Request, res: Response): Promise<void> => {
+export const getUsersForAttendance = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     if (!req?.file) {
       res.status(400).json({ message: "No face image provided" });
@@ -34,7 +41,10 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
     }
 
     // Extract face encodings from the uploaded image
-    const faceEncodings = await FaceRecognitionService.extractMultipleFaceEncodings(req.file.buffer);
+    const faceEncodings =
+      await FaceRecognitionService.extractMultipleFaceEncodings(
+        req.file.buffer
+      );
 
     if (!faceEncodings || faceEncodings.length === 0) {
       res.status(400).json({ message: "No faces detected in the image" });
@@ -45,7 +55,9 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
     const allUserFaces = (await UserFace.find()) as IUserFace[];
 
     if (allUserFaces.length === 0) {
-      res.status(400).json({ message: "No enrolled users found. Please enroll first." });
+      res
+        .status(400)
+        .json({ message: "No enrolled users found. Please enroll first." });
       return;
     }
 
@@ -55,12 +67,19 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
     // Compare each detected face with stored encodings
     for (const faceEncoding of faceEncodings) {
       for (const userFace of allUserFaces) {
-        const isMatch = await FaceRecognitionService.verifyFace(userFace.faceEncoding, faceEncoding);
+        const isMatch = await FaceRecognitionService.verifyFace(
+          userFace.faceEncoding,
+          faceEncoding
+        );
 
         if (isMatch && !recognizedUserIds.has(userFace.user.toString())) {
           const user = (await User.findById(userFace.user)) as IUser;
           if (user) {
-            recognizedUsers.push({ userId: user._id.toString(), name: user.name });
+            recognizedUsers.push({
+              userId: user._id.toString(),
+              name: user?.name,
+              email: user?.email,
+            });
             recognizedUserIds.add(user._id.toString()); // Prevent duplicate entries
           }
         }
@@ -68,19 +87,39 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
     }
 
     if (recognizedUsers.length === 0) {
-      res.status(401).json({ message: "No recognized faces found. Please try again." });
+      res
+        .status(401)
+        .json({ message: "No recognized faces found. Please try again." });
       return;
     }
 
-    // Get current date and time
+    res.status(200).json({
+      message: "Users recognized successfully",
+      recognizedUsers,
+    });
+  } catch (error) {
+    console.error("Attendance marking error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+export const markAttendance = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const users: UsersForAttendance[] = req?.body?.users ?? [];
+
+    // Compare each detected face with stored encodings
+
+    if (users.length === 0) {
+      res.status(401).json({ message: "User list empty. Please try again." });
+      return;
+    }
+
+    //Get current date and time
     const now = new Date();
     const timeString = now.toLocaleTimeString();
-
-    // Determine attendance status
-    const startHour = 9; // Example: 9 AM threshold for lateness
-    const status = now.getHours() > startHour || (now.getHours() === startHour && now.getMinutes() > 0)
-      ? AttendanceStatus.LATE
-      : AttendanceStatus.PRESENT;
 
     // Define today’s date range for attendance checking
     const today = new Date();
@@ -91,25 +130,30 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
     let attendanceResults: any[] = [];
     let alreadyMarkedUsers: string[] = [];
 
-    for (const user of recognizedUsers) {
+    for (const user of users) {
       const existingAttendance = await Attendance.findOne({
-        user: user.userId,
+        user: user.id,
         date: { $gte: today, $lt: tomorrow },
       });
-
+      const status = user.isPresent === "true" ? AttendanceStatus.PRESENT : AttendanceStatus.ABSENT;
       if (!existingAttendance) {
         // Create and save attendance record
         const attendance = new Attendance({
-          user: user.userId,
-          date: now,
+          user: user.id,
+          date: today,
           time: timeString,
           status,
         });
 
         await attendance.save();
-        attendanceResults.push({ user: user.name, status, time: timeString, date: now });
+        attendanceResults.push({
+          user: user.id,
+          status,
+          time: timeString,
+          date: today,
+        });
       } else {
-        alreadyMarkedUsers.push(user.name);
+        alreadyMarkedUsers.push(user.id);
       }
     }
 
@@ -132,7 +176,6 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
   }
 };
 
-
 /**
  * @desc Get user's attendance history
  * @route GET /api/attendance/history
@@ -144,12 +187,22 @@ export const getAttendanceHistory = async (
   try {
     const userId = req.body.userId;
     const { startDate, endDate } = req.query;
-
-    let query: any = { user: userId };
+    let query: any;
+    if (userId) {
+      query = { user: userId };
+    }
 
     if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate as string),
+        $lte: new Date(endDate as string),
+      };
+    } else if (startDate) {
+      query.date = {
+        $gte: new Date(startDate as string),
+      };
+    } else if (endDate) {
+      query.date = {
         $lte: new Date(endDate as string),
       };
     }

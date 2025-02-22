@@ -6,8 +6,13 @@ import jwt from "jsonwebtoken";
 import UserFace from "../models/UserFace";
 import FaceRecognitionService from "./FaceRecognitionService";
 
+export interface AuthRequest extends Request {
+  userId?: string;
+  userRole?: string;
+}
+
 // Secret Key for JWT
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+const JWT_SECRET = process.env.JWT_SECRET || "01842c56-03cc-4f98-b6d1-2f6e13fd3a65";
 
 /**
  * @desc Register a new user
@@ -23,6 +28,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 
     if (existingUser) {
       res.status(400).json({ message: "User already exists" }); // ✅ Added return
+      return;
     }
 
     try {
@@ -87,9 +93,9 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
  * @desc Get user profile (requires authentication)
  * @route GET /api/users/profile
  */
-export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
+export const getUserProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req?.body?.userId).select("-password");
+    const user = await User.findById(req?.userId).select("-password");
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
