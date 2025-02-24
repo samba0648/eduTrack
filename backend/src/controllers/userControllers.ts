@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
-import User, { IUser, UserRole } from "../models/User";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import csv from "csv-parser";
+import fs from "fs";
 
 import UserFace from "../models/UserFace";
+import User, { IUser, UserRole } from "../models/User";
 import FaceRecognitionService from "./FaceRecognitionService";
 
 export interface AuthRequest extends Request {
@@ -11,17 +13,90 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
+interface User {
+  name: string;
+  email: string;
+  section: string;
+}
+
 // Secret Key for JWT
-const JWT_SECRET = process.env.JWT_SECRET || "01842c56-03cc-4f98-b6d1-2f6e13fd3a65";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "01842c56-03cc-4f98-b6d1-2f6e13fd3a65";
+
+export const registerUserList = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ message: "No file uploaded" });
+      return;
+    }
+
+    const users: any[] = [];
+    const errors: any[] = [];
+
+    const stream = req.file.buffer.toString("utf8").split("\n");
+
+    for (const row of stream) {
+      const [name, email, section] = row.split(",").map((col) => col.trim());
+
+      // Skip empty rows or invalid format
+      if (!name || !email || !section) {
+        errors.push({ row, message: "Invalid format or missing fields" });
+        continue;
+      }
+
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        errors.push({
+          row,
+          message: `User with email ${email} already exists`,
+        });
+        continue;
+      }
+
+      // Hash password (default: "password123")
+      const hashedPassword = await bcrypt.hash("password123", 10);
+
+      users.push({
+        name,
+        email,
+        section,
+        password: hashedPassword,
+        role: UserRole.STUDENT,
+      });
+    }
+
+    // Insert valid users
+    if (users.length > 0) {
+      await User.insertMany(users);
+    }
+
+    res.status(200).json({
+      message: "CSV processed",
+      successCount: users.length,
+      errorCount: errors.length,
+      errors,
+    });
+  } catch (error) {
+    console.error("CSV Upload Error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
 
 /**
  * @desc Register a new user
  * @route POST /api/users/register
  */
 
-export const registerUser = async (req: Request, res: Response): Promise<void> => {
+export const registerUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const { name, email, password, role } = req?.body;
+    const { name, email, password, role, section } = req?.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -49,14 +124,15 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       res.status(201).json({ message: "User registered successfully" });
     } catch (bcryptError) {
       console.error("Bcrypt Error:", bcryptError);
-      res.status(500).json({ message: "Password hashing failed", error: bcryptError });
+      res
+        .status(500)
+        .json({ message: "Password hashing failed", error: bcryptError });
     }
   } catch (error) {
     console.error("Server Error:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
-
 
 /**
  * @desc Login user & get token
@@ -83,7 +159,15 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       expiresIn: "7d",
     });
 
-    res.json({ token, user: { id: user?._id, name: user?.name, email: user?.email, role: user?.role } });
+    res.json({
+      token,
+      user: {
+        id: user?._id,
+        name: user?.name,
+        email: user?.email,
+        role: user?.role,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
@@ -93,7 +177,10 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
  * @desc Get user profile (requires authentication)
  * @route GET /api/users/profile
  */
-export const getUserProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserProfile = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     const user = await User.findById(req?.userId).select("-password");
     if (!user) {
@@ -110,7 +197,10 @@ export const getUserProfile = async (req: AuthRequest, res: Response): Promise<v
  * @desc Get all users (Admin only)
  * @route GET /api/users
  */
-export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+export const getAllUsers = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const users = await User.find().select("-password");
     res.json(users);
@@ -123,25 +213,30 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
  * @desc Enroll user's face
  * @route POST /api/users/enroll-face/:id
  */
-export const enrollUserFace = async (req: Request, res: Response): Promise<void> => {
+export const enrollUserFace = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
   try {
     if (!req?.file) {
       res.status(400).json({ message: "No image provided" });
       return;
     }
 
-    const userId = req.body.id;
-    
+    const userId = req?.userId;
+
     // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
-    
+
     // Extract face encoding
-    const faceEncoding = await FaceRecognitionService.extractFaceEncoding(req?.file?.buffer);
-    
+    const faceEncoding = await FaceRecognitionService.extractFaceEncoding(
+      req?.file?.buffer
+    );
+
     if (!faceEncoding) {
       res.status(400).json({ message: "No face detected in the image" });
       return;
@@ -149,7 +244,7 @@ export const enrollUserFace = async (req: Request, res: Response): Promise<void>
 
     // Check if user already has face enrollment
     let userFace = await UserFace.findOne({ user: userId });
-    
+
     if (userFace) {
       // Update existing face encoding
       userFace.faceEncoding = faceEncoding;
@@ -158,7 +253,7 @@ export const enrollUserFace = async (req: Request, res: Response): Promise<void>
       // Create new face enrollment
       userFace = new UserFace({
         user: userId,
-        faceEncoding
+        faceEncoding,
       });
       await userFace.save();
     }

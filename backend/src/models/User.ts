@@ -15,6 +15,7 @@ export interface IUser extends Document {
   password: string;
   role: UserRole;
   createdAt: Date;
+  section: string|null;
 }
 
 // Define the User Schema
@@ -42,6 +43,9 @@ const UserSchema: Schema = new Schema(
       enum: Object.values(UserRole),
       default: UserRole.STUDENT,
     },
+    section:{
+      type: String,
+    }
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

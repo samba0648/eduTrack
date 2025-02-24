@@ -19,7 +19,7 @@ const upload = multer({ storage });
 
 // Attendance routes
 router.post("/getUsers", upload.single("faceImage"), teacherOnly, getUsersForAttendance);
-router.post("/mark", upload.single("faceImage"), teacherOnly, markAttendance);
+router.post("/mark", teacherOnly, markAttendance);
 router.get("/history", getAttendanceHistory);
 router.get("/report", getAttendanceReport);
 router.get("/stats", getAttendanceStats);
