@@ -9,7 +9,7 @@ import {
   markAttendance
 } from "../controllers/attendanceController";
 import multer from "multer";
-import { teacherOnly } from "../middlewares/authMiddleware";
+import { protect, teacherOnly } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
@@ -20,8 +20,8 @@ const upload = multer({ storage });
 // Attendance routes
 router.post("/getUsers", upload.single("faceImage"), teacherOnly, getUsersForAttendance);
 router.post("/mark", teacherOnly, markAttendance);
-router.get("/history", getAttendanceHistory);
-router.get("/report", getAttendanceReport);
-router.get("/stats", getAttendanceStats);
+router.get("/history", protect, getAttendanceHistory);
+router.get("/report", protect, getAttendanceReport);
+router.get("/stats", protect, getAttendanceStats);
 
 export default router;

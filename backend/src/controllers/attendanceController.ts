@@ -135,7 +135,10 @@ export const markAttendance = async (
         user: user.id,
         date: { $gte: today, $lt: tomorrow },
       });
-      const status = user.isPresent === "true" ? AttendanceStatus.PRESENT : AttendanceStatus.ABSENT;
+      const status =
+        user.isPresent === "true"
+          ? AttendanceStatus.PRESENT
+          : AttendanceStatus.ABSENT;
       if (!existingAttendance) {
         // Create and save attendance record
         const attendance = new Attendance({
@@ -187,23 +190,34 @@ export const getAttendanceHistory = async (
   try {
     const userId = req.body.userId;
     const { startDate, endDate } = req.query;
-    let query: any;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let query: any = { date: { $gte: today } };
     if (userId) {
       query = { user: userId };
     }
 
     if (startDate && endDate) {
+      let _startDate = new Date(startDate as string);
+      _startDate.setHours(0, 0, 0, 0);
+      let _endDate = new Date(endDate as string);
+      _endDate.setHours(23, 59, 59, 999);
       query.date = {
-        $gte: new Date(startDate as string),
-        $lte: new Date(endDate as string),
+        $gte: _startDate,
+        $lte: _endDate,
       };
     } else if (startDate) {
+      let _startDate = new Date(startDate as string);
+      _startDate.setHours(0, 0, 0, 0);
       query.date = {
-        $gte: new Date(startDate as string),
+        $gte: _startDate,
       };
     } else if (endDate) {
+      let _endDate = new Date(endDate as string);
+      _endDate.setHours(23, 59, 59, 999);
       query.date = {
-        $lte: new Date(endDate as string),
+        $lte: _endDate,
       };
     }
 

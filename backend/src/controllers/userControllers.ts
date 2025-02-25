@@ -203,7 +203,7 @@ export const getAllUsers = async (
 ): Promise<void> => {
   try {
     const users = await User.find().select("-password");
-    res.json(users);
+    res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
@@ -261,6 +261,22 @@ export const enrollUserFace = async (
     res.status(200).json({ message: "Face enrolled successfully" });
   } catch (error) {
     console.error("Face enrollment error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+/**
+ * @desc Get all users (Admin only)
+ * @route GET /api/users/students
+ */
+export const getAllStudents = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const students = await User.find({ role: "student" }).select("-password");
+    res.status(200).json(students);
+  } catch (error) {
     res.status(500).json({ message: "Server error", error });
   }
 };

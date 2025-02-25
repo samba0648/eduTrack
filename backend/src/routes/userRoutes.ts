@@ -7,6 +7,7 @@ import {
   getAllUsers,
   enrollUserFace,
   registerUserList,
+  getAllStudents
 } from "../controllers/userControllers";
 import { protect, adminOnly, teacherOnly } from "../middlewares/authMiddleware";
 
@@ -32,5 +33,6 @@ router.post(
   teacherOnly,
   registerUserList
 );
+router.get("/students", teacherOnly, getAllStudents)
 
 export default router;
