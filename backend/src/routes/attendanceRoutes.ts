@@ -6,7 +6,8 @@ import {
   getAttendanceHistory,
   getAttendanceReport,
   getAttendanceStats,
-  markAttendance
+  markAttendance,
+  getStudentAttendanceHistory
 } from "../controllers/attendanceController";
 import multer from "multer";
 import { protect, teacherOnly } from "../middlewares/authMiddleware";
@@ -23,5 +24,6 @@ router.post("/mark", teacherOnly, markAttendance);
 router.get("/history", protect, getAttendanceHistory);
 router.get("/report", protect, getAttendanceReport);
 router.get("/stats", protect, getAttendanceStats);
+router.get("/studentHistory", protect, getStudentAttendanceHistory);
 
 export default router;

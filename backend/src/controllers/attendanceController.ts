@@ -4,7 +4,8 @@ import Attendance, { AttendanceStatus } from "../models/Attendance";
 import UserFace from "../models/UserFace";
 import User from "../models/User";
 import FaceRecognitionService from "./FaceRecognitionService";
-import { sendNotification } from "./NotificationController";
+import { AuthRequest } from "./userControllers";
+import { sendEmailNotification } from "../config/emailService";
 
 interface IUserFace {
   user: string; // or mongoose.Schema.Types.ObjectId
@@ -72,7 +73,7 @@ export const getUsersForAttendance = async (
           userFace.faceEncoding,
           faceEncoding
         );
-
+        console.log("user match", userFace.user, isMatch);
         if (isMatch && !recognizedUserIds.has(userFace.user.toString())) {
           const user = (await User.findById(userFace.user)) as IUser;
           if (user) {
@@ -156,10 +157,13 @@ export const markAttendance = async (
           time: timeString,
           date: today,
         });
+        const _user = await User.findOne({ _id: user.id });
+        if (_user) {
+          await sendEmailNotification(_user?.email, _user?.name, status, today.toString());
+        }
       } else {
         alreadyMarkedUsers.push(user.id);
       }
-      await sendNotification(user.id, status);
     }
 
     if (attendanceResults.length === 0) {
@@ -169,7 +173,7 @@ export const markAttendance = async (
       });
       return;
     }
-    
+
     res.status(200).json({
       message: "Attendance marked successfully for recognized users",
       attendance: attendanceResults,
@@ -185,21 +189,17 @@ export const markAttendance = async (
  * @desc Get user's attendance history
  * @route GET /api/attendance/history
  */
-export const getAttendanceHistory = async (
-  req: Request,
+export const getStudentAttendanceHistory = async (
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const userId = req.body.userId;
     const { startDate, endDate } = req.query;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let query: any = { date: { $gte: today } };
+    const userId = req?.userId;
+    let query: any = {};
     if (userId) {
-      query = { user: userId };
+      query.user = userId;
     }
-
     if (startDate && endDate) {
       let _startDate = new Date(startDate as string);
       _startDate.setHours(0, 0, 0, 0);
@@ -223,7 +223,57 @@ export const getAttendanceHistory = async (
       };
     }
 
-    const attendanceRecords = await Attendance.find(query).sort({ date: -1 });
+    const attendanceRecords = await Attendance.find(query)
+      .populate("user", "name")
+      .sort({ date: -1 });
+
+    res.status(200).json(attendanceRecords);
+  } catch (error) {
+    console.error("Attendance history fetch error:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+/**
+ * @desc Get user's attendance history
+ * @route GET /api/attendance/history
+ */
+export const getAttendanceHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let query: any = { date: { $gte: today } };
+    if (startDate && endDate) {
+      let _startDate = new Date(startDate as string);
+      _startDate.setHours(0, 0, 0, 0);
+      let _endDate = new Date(endDate as string);
+      _endDate.setHours(23, 59, 59, 999);
+      query.date = {
+        $gte: _startDate,
+        $lte: _endDate,
+      };
+    } else if (startDate) {
+      let _startDate = new Date(startDate as string);
+      _startDate.setHours(0, 0, 0, 0);
+      query.date = {
+        $gte: _startDate,
+      };
+    } else if (endDate) {
+      let _endDate = new Date(endDate as string);
+      _endDate.setHours(23, 59, 59, 999);
+      query.date = {
+        $lte: _endDate,
+      };
+    }
+
+    const attendanceRecords = await Attendance.find(query)
+      .populate("user", "name")
+      .sort({ date: -1 });
 
     res.json(attendanceRecords);
   } catch (error) {

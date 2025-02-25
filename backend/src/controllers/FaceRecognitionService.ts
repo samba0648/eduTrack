@@ -98,7 +98,7 @@ class FaceRecognitionService {
   }
 
   async verifyFace(storedEncoding: number[], currentEncoding: number[]): Promise<boolean> {
-    const THRESHOLD = 0.6;
+    const THRESHOLD = 0.7;
     const distance = await this.compareFaces(storedEncoding, currentEncoding);
     return distance < THRESHOLD;
   }
