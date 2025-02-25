@@ -21,7 +21,7 @@ class FaceRecognitionService {
   }
 
   private async loadModels() {
-    const MODEL_PATH = path.join(__dirname, '../models');
+    const MODEL_PATH = path.join(__dirname, '../models/face-api');
 
     try {
       await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_PATH);

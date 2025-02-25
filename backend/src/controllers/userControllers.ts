@@ -118,6 +118,7 @@ export const registerUser = async (
         email,
         password: hashedPassword,
         role: role || UserRole.STUDENT,
+        section
       });
 
       await newUser.save();
@@ -257,6 +258,8 @@ export const enrollUserFace = async (
       });
       await userFace.save();
     }
+    user.isFaceSet = true;
+    await user.save();
 
     res.status(200).json({ message: "Face enrolled successfully" });
   } catch (error) {

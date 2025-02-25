@@ -4,6 +4,7 @@ import Attendance, { AttendanceStatus } from "../models/Attendance";
 import UserFace from "../models/UserFace";
 import User from "../models/User";
 import FaceRecognitionService from "./FaceRecognitionService";
+import { sendNotification } from "./NotificationController";
 
 interface IUserFace {
   user: string; // or mongoose.Schema.Types.ObjectId
@@ -158,6 +159,7 @@ export const markAttendance = async (
       } else {
         alreadyMarkedUsers.push(user.id);
       }
+      await sendNotification(user.id, status);
     }
 
     if (attendanceResults.length === 0) {
@@ -167,7 +169,7 @@ export const markAttendance = async (
       });
       return;
     }
-
+    
     res.status(200).json({
       message: "Attendance marked successfully for recognized users",
       attendance: attendanceResults,

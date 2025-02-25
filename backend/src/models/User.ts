@@ -16,6 +16,7 @@ export interface IUser extends Document {
   role: UserRole;
   createdAt: Date;
   section: string|null;
+  isFaceSet: boolean;
 }
 
 // Define the User Schema
@@ -45,6 +46,10 @@ const UserSchema: Schema = new Schema(
     },
     section:{
       type: String,
+    },
+    isFaceSet:{
+      type: Boolean,
+      default: false,
     }
   },
   {
