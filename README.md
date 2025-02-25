@@ -53,9 +53,12 @@ cd ..
 ```
 
 ## Install Application
-
+# IOS
 ```
 npx react-native run-ios
+```
+# Android
+```
 npx react-native run-android
 ```
 ## Start metro
