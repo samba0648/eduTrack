@@ -224,7 +224,7 @@ export const enrollUserFace = async (
       return;
     }
 
-    const userId = req?.userId;
+    const userId = req?.body?.id;
 
     // Check if user exists
     const user = await User.findById(userId);
