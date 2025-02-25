@@ -1,35 +1,34 @@
 import emailjs from "@emailjs/nodejs";
 import dotenv from "dotenv";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
-const SERVICE_ID = process.env.EMAILJS_SERVICE_ID!;
-const TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID!;
-const PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY!;
-const PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY!;
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // Your Gmail address
+    pass: process.env.EMAIL_PASS, // Your Gmail App Password
+  },
+});
 
-export const sendEmailNotification = async (
+export const sendEmailWithNodemailer = async (
   toEmail: string,
   userName: string,
-  status: string,
-  today: string
+  attendanceStatus: string,
+  date: string
 ) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: toEmail,
+    subject: `Attendance update for ${date}`,
+    html: `Hello <b><i>${userName}</i></b>,<br />Your attendance has been marked as <b>${attendanceStatus}</b> on ${date}.`,
+  };
+
   try {
-    console.log('toEmail', toEmail);
-    const templateParams = {
-      user_email: toEmail,
-      user_name: userName,
-      attendance_status: status,
-      date: today
-    };
-
-    await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, {
-      publicKey: PUBLIC_KEY,
-      privateKey: PRIVATE_KEY
-    });
-
-    console.log(`Email sent to ${toEmail} - ${status}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully:", info.response);
   } catch (error) {
-    console.error("Error sending email via EmailJS:", error);
+    console.error("Error sending email:", error);
   }
 };

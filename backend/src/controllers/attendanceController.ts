@@ -5,7 +5,7 @@ import UserFace from "../models/UserFace";
 import User from "../models/User";
 import FaceRecognitionService from "./FaceRecognitionService";
 import { AuthRequest } from "./userControllers";
-import { sendEmailNotification } from "../config/emailService";
+import { sendEmailWithNodemailer } from "../config/emailService";
 
 interface IUserFace {
   user: string; // or mongoose.Schema.Types.ObjectId
@@ -105,6 +105,13 @@ export const getUsersForAttendance = async (
   }
 };
 
+const formatDateISO = (date:Date) => {
+  // Convert the date to ISO string
+  const isoString = date.toISOString();
+  // Split at the "T" character to get the date part
+  const formattedDate = isoString.split("T")[0];
+  return formattedDate.toString();
+};
 export const markAttendance = async (
   req: Request,
   res: Response
@@ -124,11 +131,11 @@ export const markAttendance = async (
     const timeString = now.toLocaleTimeString();
 
     // Define today’s date range for attendance checking
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    let today:any = new Date();
+   
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-
+    today = formatDateISO(today);
     let attendanceResults: any[] = [];
     let alreadyMarkedUsers: string[] = [];
 
@@ -149,7 +156,15 @@ export const markAttendance = async (
           time: timeString,
           status,
         });
-
+        const _user = await User.findOne({ _id: user.id });
+        if (_user) {
+          await sendEmailWithNodemailer(
+            _user?.email,
+            _user?.name,
+            status,
+            today.toString()
+          );
+        }
         await attendance.save();
         attendanceResults.push({
           user: user.id,
@@ -157,10 +172,6 @@ export const markAttendance = async (
           time: timeString,
           date: today,
         });
-        const _user = await User.findOne({ _id: user.id });
-        if (_user) {
-          await sendEmailNotification(_user?.email, _user?.name, status, today.toString());
-        }
       } else {
         alreadyMarkedUsers.push(user.id);
       }
