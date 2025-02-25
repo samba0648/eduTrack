@@ -1,3 +1,4 @@
+# Backend
 ## Prerequisites:
 - Node should be installed (version 18.20.3)
 - MongoDB should be installed
@@ -10,6 +11,15 @@ cd eduTrack/backend
 ## Install the dependencies
 ```
 npm install
+```
+## Add the environmental variables
+```
+PORT=8000
+MONGO_URI=mongodb://localhost:27017/eduSmart # db link
+JWT_SECRET=secret-key
+
+EMAIL_USER=mail
+EMAIL_PASS=pass
 ```
 ## Run the server
 ```
